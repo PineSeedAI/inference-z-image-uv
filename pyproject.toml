@@ -1,0 +1,13 @@
+[project]
+name = "z-image"
+version = "0.1.0"
+description = "Generate images with Z-Image using latest diffusers"
+requires-python = ">=3.12"
+dependencies = [
+    "torch",
+    "pillow",
+    "accelerate",
+    "transformers",
+    "diffusers @ git+https://github.com/huggingface/diffusers.git",
+]
+

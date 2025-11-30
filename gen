@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""
+Z-Image Generator using latest diffusers from source
+
+This uses a pyproject.toml to specify git-based dependencies,
+which aren't supported in PEP 723 inline metadata.
+
+Usage:
+    cd script/z-image
+    uv run z-image.py "A beautiful sunset" output.png
+"""
+
+import sys
+import torch
+from diffusers import ZImagePipeline
+
+def main():
+    if len(sys.argv) < 3:
+        print("Usage: z-image.py <prompt> <output_path> <size> [--verbose]", file=sys.stderr)
+        print("\nExample:", file=sys.stderr)
+        print('  z-image.py "A beautiful sunset" output.png 256', file=sys.stderr)
+        sys.exit(1)
+    
+    verbose = "--verbose" in sys.argv or "-v" in sys.argv
+    
+    if verbose:
+        print(sys.argv)
+
+    prompt = sys.argv[1]
+    output_path = sys.argv[2]
+    size = sys.argv[3]
+    if not size:
+        size = 256
+    elif not size.isdigit():
+        print("Size must be an integer", file=sys.stderr)
+        sys.exit(1)
+    size = int(size)
+    if size < 16 or size > 1024:
+        print("Size must be between 16 and 1024", file=sys.stderr)
+        sys.exit(1)
+
+    # Auto-detect best available device
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
+    if verbose:
+        print(f"Using device: {device}")
+
+    # 1. Load the pipeline
+    if verbose:
+        print("Loading pipeline...")
+    # Use float16 for MPS compatibility, bfloat16 for CUDA
+    dtype = torch.bfloat16
+    pipe = ZImagePipeline.from_pretrained(
+        "Tongyi-MAI/Z-Image-Turbo",
+        torch_dtype=dtype,
+        low_cpu_mem_usage=True,
+    )
+    pipe.to(device)
+
+    # [Optional] Model Compilation
+    # Only compile on CUDA - MPS has compatibility issues with Python 3.13
+    if device == "cuda":
+        if verbose:
+            print("Compiling model...")
+        pipe.transformer.compile()
+
+    # [Optional] CPU Offloading for memory-constrained devices (Mac)
+    if device == "mps":
+        if verbose:
+            print("Enabling sequential CPU offload...")
+        pipe.enable_sequential_cpu_offload()
+
+    # 2. Generate Image
+    if verbose:
+        print("Generating image...")
+    image = pipe(
+        prompt=prompt,
+        height=size,
+        width=size,
+        num_inference_steps=9,  # This actually results in 8 DiT forwards
+        guidance_scale=0.0,     # Guidance should be 0 for the Turbo models
+        generator=torch.Generator(device).manual_seed(42),
+    ).images[0]
+
+    if verbose:
+        print(f"Saving image to: {output_path}")
+    image.save(output_path)
+    if verbose:
+        print(f"Image saved to: {output_path}")
+
+if __name__ == "__main__":
+    main()
+
