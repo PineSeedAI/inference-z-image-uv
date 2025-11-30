@@ -21,7 +21,7 @@ uv run --directory <path-to-z-image-dir> gen <prompt> <output_path> <size>
 3. Caches everything for future runs
 4. Runs the script
 
-### Note: First run will be slower (cloning diffusers repo), subsequent runs are instant.
+### Note: First run will be slower (cloning diffusers repo), subsequent runs are cached.
 
 #### Why a directory instead of a single script?
 
